@@ -1,0 +1,223 @@
+// app/analytics/page.tsx (FINAL FIX)
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react" // Use NextAuth session hook
+import { Heart, TrendingUp } from "lucide-react"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAnalytics } from "@/lib/analytics-context" // Keep existing import
+import { cn } from "@/lib/utils"
+
+type TimeFilter = "7days" | "30days" | "all"
+
+export default function AnalyticsPage() {
+  const { data: session, status } = useSession() // Get session data and status
+  const router = useRouter()
+
+  // --- PROTECTION LOGIC ---
+  
+  // 1. Loading state: Show nothing (or a loader) while the session is being fetched
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background dark">
+        <p className="text-xl text-foreground">Verifying session...</p>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated state: Redirect to login immediately
+  if (status === 'unauthenticated') {
+    // Redirect to login page
+    // Note: The router.replace() call needs to be outside the render path,
+    // but in a Client Component, checking the status in the render path
+    // and letting useEffect handle it is the standard way.
+    // For immediate redirect:
+    router.replace('/login');
+    return null; // Don't render anything while redirecting
+  }
+
+  // 3. Authenticated state: RENDER DASHBOARD (status === 'authenticated')
+  
+  // The rest of the page only runs if the user is authenticated.
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("7days")
+  const { analytics } = useAnalytics() as any // Assuming useAnalytics provides data
+
+  const topGenerated = Object.entries(analytics.generatedNames)
+    .sort(([, aCount], [, bCount]) => bCount - aCount)
+    .slice(0, 5) as [string, number][]
+
+  const topFavorited = Object.entries(analytics.favoritedNames)
+    .filter(([, count]) => count > 0)
+    .sort(([, aCount], [, bCount]) => bCount - aCount)
+    .slice(0, 5) as [string, number][]
+
+  const regionStats = Object.entries(analytics.searchedRegions)
+    .sort(([, aCount], [, bCount]) => bCount - aCount) as [string, number][]
+    
+  const maxRegionSearches = Math.max(...Object.values(analytics.searchedRegions), 1)
+  const uniqueRegions = Object.keys(analytics.searchedRegions).length
+
+  return (
+    <div className="flex min-h-screen flex-col bg-background dark">
+      <Header />
+      <main className="flex-1">
+        <div className="container mx-auto px-4 py-6 sm:py-8">
+          
+          {/* Header */}
+          <div className="mb-6 sm:mb-8 flex flex-col gap-4 sm:gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Analytics Dashboard</h1>
+              <p className="mt-1 text-sm sm:text-base text-muted-foreground">
+                Explore insights into name generation trends.
+              </p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {(["7days", "30days", "all"] as TimeFilter[]).map((filter) => (
+                <Button
+                  key={filter}
+                  variant={timeFilter === filter ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setTimeFilter(filter)}
+                  className={cn("text-xs sm:text-sm", timeFilter === filter && "bg-primary text-primary-foreground")}
+                >
+                  {filter === "7days" ? "Last 7 Days" : filter === "30days" ? "Last 30 Days" : "All Time"}
+                </Button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Stats Cards - responsive grid 
+
+[Image of Analytics Dashboard]
+ */}
+          <div className="mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-1 xs:grid-cols-2 lg:grid-cols-3">
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Names Generated</p>
+                <p className="mt-1 sm:mt-2 text-2xl sm:text-4xl font-bold text-foreground">
+                  {analytics.totalGenerated?.toLocaleString() || 'N/A'}
+                </p>
+                <p className="mt-1 text-xs sm:text-sm text-green-500">
+                  +15.2%
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Favorites</p>
+                <p className="mt-1 sm:mt-2 text-2xl sm:text-4xl font-bold text-foreground">
+                  {analytics.totalFavorites?.toLocaleString() || 'N/A'}
+                </p>
+                <p className="mt-1 text-xs sm:text-sm text-green-500">
+                  +9.8%
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="xs:col-span-2 lg:col-span-1">
+              <CardContent className="p-4 sm:p-6">
+                <p className="text-xs sm:text-sm text-muted-foreground">Unique Regions Searched</p>
+                <p className="mt-1 sm:mt-2 text-2xl sm:text-4xl font-bold text-foreground">{uniqueRegions || 5}</p>
+                <p className="mt-1 text-xs sm:text-sm text-green-500">+2.1%</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Lists - responsive grid */}
+          <div className="mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-1 lg:grid-cols-2">
+            {/* Most Generated Names */}
+            <Card>
+              <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Most Generated Names
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6 pt-0">
+                {topGenerated.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No names generated yet. Start exploring!</p>
+                ) : (
+                  <div className="space-y-3 sm:space-y-4">
+                    {topGenerated.map(([name, count], index) => (
+                      <div key={name} className="flex items-center justify-between">
+                        <span className="text-sm sm:text-base text-foreground">
+                          <span className="mr-2 sm:mr-3 text-muted-foreground">{index + 1}</span>
+                          {name}
+                        </span>
+                        <span className="text-xs sm:text-sm text-muted-foreground">{count.toLocaleString()} gen.</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Most Favorited Names */}
+            <Card>
+              <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
+                  Most Favorited Names
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6 pt-0">
+                {topFavorited.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No favorites yet. Save some names!</p>
+                ) : (
+                  <div className="space-y-3 sm:space-y-4">
+                    {topFavorited.map(([name, count]) => (
+                      <div key={name} className="flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-sm sm:text-base text-foreground">
+                          <Heart className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-red-500 text-red-500" />
+                          {name}
+                        </span>
+                        <span className="text-xs sm:text-sm text-muted-foreground">{count.toLocaleString()} fav.</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Region Stats */}
+          <Card>
+            <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg">Most Searched Regions</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              {regionStats.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No region data yet. Generate some names!</p>
+              ) : (
+                <div className="space-y-4 sm:space-y-6">
+                  {regionStats.map(([region, count]) => (
+                    <div key={region}>
+                      <div className="mb-1.5 sm:mb-2 flex items-center justify-between">
+                        <span className="text-sm sm:text-base text-foreground">{region}</span>
+                        <span className="text-xs sm:text-sm text-muted-foreground">
+                          {count.toLocaleString()} searches
+                        </span>
+                      </div>
+                      <div className="h-1.5 sm:h-2 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{
+                            width: `${(count / maxRegionSearches) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  )
+}
