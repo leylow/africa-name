@@ -2,7 +2,9 @@
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import * as bcrypt from 'bcryptjs' // Used for password comparison
-import prisma from '@/lib/prisma' // Adjust path if necessary, but assumes your Prisma client is exported here
+//import prisma from '@/lib/prisma' // Adjust path if necessary, but assumes your Prisma client is exported here
+import prisma from '../../../../lib/prisma'
+
 
 const handler = NextAuth({
   providers: [
