@@ -17,6 +17,7 @@ type TimeFilter = "7days" | "30days" | "all"
 export default function AnalyticsPage() {
   const { data: session, status } = useSession() // Get session data and status
   const router = useRouter()
+    const [timeFilter, setTimeFilter] = useState<TimeFilter>("7days")
 
   // --- PROTECTION LOGIC ---
   
@@ -43,7 +44,7 @@ export default function AnalyticsPage() {
   // 3. Authenticated state: RENDER DASHBOARD (status === 'authenticated')
   
   // The rest of the page only runs if the user is authenticated.
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("7days")
+
   const { analytics } = useAnalytics() as any // Assuming useAnalytics provides data
 
   const topGenerated = Object.entries(analytics.generatedNames)
