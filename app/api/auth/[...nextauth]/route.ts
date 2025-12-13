@@ -40,7 +40,7 @@ const handler = NextAuth({
             // SUCCESS: Return the user object (MUST NOT include the hashed password)
             return { 
               id: user.id, 
-              name: user.fullName || user.email, // Use fullName for display
+              name: user.name || user.email, // Use fullName for display
               email: user.email,
             };
           }
