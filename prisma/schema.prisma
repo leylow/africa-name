@@ -2,8 +2,9 @@
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://africa_name_user:dOpnTZbbvIqPiPamB27FF7Jxfs7lmJqX@dpg-d4v5oiu3jp1c73ee31bg-a.virginia-postgres.render.com/africa_name"
+  url      = env("DATABASE_URL")
 }
+
 
 generator client {
   provider = "prisma-client-js"
