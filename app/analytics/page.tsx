@@ -1,66 +1,63 @@
-// app/analytics/page.tsx (FINAL FIX)
+// app/analytics/page.tsx
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useSession } from "next-auth/react" // Use NextAuth session hook
+import { useSession } from "next-auth/react"
 import { Heart, TrendingUp } from "lucide-react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useAnalytics } from "@/lib/analytics-context" // Keep existing import
+import { useAnalytics } from "@/lib/analytics-context"
 import { cn } from "@/lib/utils"
 
 type TimeFilter = "7days" | "30days" | "all"
 
 export default function AnalyticsPage() {
-  const { data: session, status } = useSession() // Get session data and status
+  const { status } = useSession() // We only need the status here for protection
   const router = useRouter()
-    const [timeFilter, setTimeFilter] = useState<TimeFilter>("7days")
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("7days")
+
+  // Destructure 'analytics' data AND the 'loading' state from the context
+  const { analytics, loading: contextLoading } = useAnalytics() as any 
 
   // --- PROTECTION LOGIC ---
   
-  // 1. Loading state: Show nothing (or a loader) while the session is being fetched
-  if (status === 'loading') {
+  // 1. Loading state: Show loader while session is loading OR while the context data is fetching
+  if (status === 'loading' || contextLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background dark">
-        <p className="text-xl text-foreground">Verifying session...</p>
+        <p className="text-xl text-foreground">
+            {status === 'loading' ? 'Verifying session...' : 'Fetching user data...'}
+        </p>
       </div>
     );
   }
 
   // 2. Unauthenticated state: Redirect to login immediately
   if (status === 'unauthenticated') {
-    // Redirect to login page
-    // Note: The router.replace() call needs to be outside the render path,
-    // but in a Client Component, checking the status in the render path
-    // and letting useEffect handle it is the standard way.
-    // For immediate redirect:
     router.replace('/login');
-    return null; // Don't render anything while redirecting
+    return null;
   }
 
-  // 3. Authenticated state: RENDER DASHBOARD (status === 'authenticated')
+  // 3. Authenticated & Data Loaded state: RENDER DASHBOARD
   
-  // The rest of the page only runs if the user is authenticated.
-
-  const { analytics } = useAnalytics() as any // Assuming useAnalytics provides data
-
-  const topGenerated = Object.entries(analytics.generatedNames)
+  // Data preparation (using || {} to handle initial empty state from the context)
+  const topGenerated = Object.entries(analytics.generatedNames || {})
     .sort(([, aCount], [, bCount]) => bCount - aCount)
     .slice(0, 5) as [string, number][]
 
-  const topFavorited = Object.entries(analytics.favoritedNames)
+  const topFavorited = Object.entries(analytics.favoritedNames || {})
     .filter(([, count]) => count > 0)
     .sort(([, aCount], [, bCount]) => bCount - aCount)
     .slice(0, 5) as [string, number][]
 
-  const regionStats = Object.entries(analytics.searchedRegions)
+  const regionStats = Object.entries(analytics.searchedRegions || {})
     .sort(([, aCount], [, bCount]) => bCount - aCount) as [string, number][]
     
-  const maxRegionSearches = Math.max(...Object.values(analytics.searchedRegions), 1)
-  const uniqueRegions = Object.keys(analytics.searchedRegions).length
+  const maxRegionSearches = Math.max(...Object.values(analytics.searchedRegions || {}), 1)
+  const uniqueRegions = Object.keys(analytics.searchedRegions || {}).length
 
   return (
     <div className="flex min-h-screen flex-col bg-background dark">
@@ -91,16 +88,13 @@ export default function AnalyticsPage() {
             </div>
           </div>
           
-          {/* Stats Cards - responsive grid 
-
-[Image of Analytics Dashboard]
- */}
+          {/* Stats Cards */}
           <div className="mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-1 xs:grid-cols-2 lg:grid-cols-3">
             <Card>
               <CardContent className="p-4 sm:p-6">
                 <p className="text-xs sm:text-sm text-muted-foreground">Total Names Generated</p>
                 <p className="mt-1 sm:mt-2 text-2xl sm:text-4xl font-bold text-foreground">
-                  {analytics.totalGenerated?.toLocaleString() || 'N/A'}
+                  {analytics.totalGenerated?.toLocaleString() || '0'}
                 </p>
                 <p className="mt-1 text-xs sm:text-sm text-green-500">
                   +15.2%
@@ -111,7 +105,7 @@ export default function AnalyticsPage() {
               <CardContent className="p-4 sm:p-6">
                 <p className="text-xs sm:text-sm text-muted-foreground">Total Favorites</p>
                 <p className="mt-1 sm:mt-2 text-2xl sm:text-4xl font-bold text-foreground">
-                  {analytics.totalFavorites?.toLocaleString() || 'N/A'}
+                  {analytics.totalFavorites?.toLocaleString() || '0'}
                 </p>
                 <p className="mt-1 text-xs sm:text-sm text-green-500">
                   +9.8%
@@ -121,7 +115,7 @@ export default function AnalyticsPage() {
             <Card className="xs:col-span-2 lg:col-span-1">
               <CardContent className="p-4 sm:p-6">
                 <p className="text-xs sm:text-sm text-muted-foreground">Unique Regions Searched</p>
-                <p className="mt-1 sm:mt-2 text-2xl sm:text-4xl font-bold text-foreground">{uniqueRegions || 5}</p>
+                <p className="mt-1 sm:mt-2 text-2xl sm:text-4xl font-bold text-foreground">{uniqueRegions || 0}</p>
                 <p className="mt-1 text-xs sm:text-sm text-green-500">+2.1%</p>
               </CardContent>
             </Card>

@@ -1,8 +1,9 @@
+
+
 // app/api/auth/[...nextauth]/route.ts
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import * as bcrypt from 'bcryptjs' // Used for password comparison
-//import prisma from '@/lib/prisma' // Adjust path if necessary, but assumes your Prisma client is exported here
+import * as bcrypt from 'bcryptjs'
 import prisma from '../../../../lib/prisma'
 
 
@@ -25,32 +26,51 @@ const handler = NextAuth({
         });
 
         if (!user) {
-          // Email not found
           return null; 
         }
 
         // 2. Compare the passwords
         if (user.password) {
           const isPasswordValid = await bcrypt.compare(
-            credentials.password, // Plain text password from form
-            user.password          // Hashed password from DB (assuming your schema maps the hash to this field)
+            credentials.password,
+            user.password
           );
 
           if (isPasswordValid) {
-            // SUCCESS: Return the user object (MUST NOT include the hashed password)
+            // SUCCESS: Return the user object (MUST include the database ID)
+            // The structure returned here is passed to the 'jwt' callback.
             return { 
-              id: user.id, 
-              name: user.name || user.email, // Use fullName for display
+              id: user.id, // <--- CRITICAL: Pass the database ID here
+              name: user.name || user.email, 
               email: user.email,
             };
           }
         }
         
-        // FAILURE: Password invalid or hash missing
+        // FAILURE
         return null;
       }
     })
   ],
+  callbacks: {
+    // 1. JWT Callback: Add the user's ID to the JWT token
+    async jwt({ token, user }) {
+      if (user) {
+        // 'user' is the object returned from the 'authorize' function above.
+        token.id = user.id; // Attach the database ID to the token
+      }
+      return token;
+    },
+    
+    // 2. Session Callback: Add the ID from the JWT token to the session object
+    async session({ session, token }) {
+      if (token.id) {
+        // Attach the ID from the token (which came from the database) to the session object
+        session.user.id = token.id as string; // <--- CRITICAL: ID is now available in session.user.id
+      }
+      return session;
+    },
+  },
   pages: {
     signIn: "/login",
     error: "/login",
@@ -58,8 +78,10 @@ const handler = NextAuth({
   session: {
     strategy: "jwt",
   },
-  // Ensure NEXTAUTH_SECRET is set in .env.local
   // secret: process.env.NEXTAUTH_SECRET,
 });
 
 export { handler as GET, handler as POST };
+
+// NOTE: You may need to extend the NextAuth types if session.user.id gives a TypeScript error.
+// See the instruction below.
